@@ -138,12 +138,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is available for use under the MIT License.
 
-## Authors
-
-- Lucas NPC
-- David
-- Omar
-
 ---
 
 Built with ❤️ using SwiftUI and SwiftData
