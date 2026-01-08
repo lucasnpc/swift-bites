@@ -5,10 +5,12 @@ struct CategorySection: View {
   let category: Category
   
   @Query private var allRecipes: [Recipe]
+  @Environment(\.modelContext) private var modelContext
   
   private var categoryRecipes: [Recipe] {
-    allRecipes.filter { recipe in
-      recipe.category?.persistentModelID == category.persistentModelID
+    let categoryID = category.persistentModelID
+    return allRecipes.filter { recipe in
+      safeCategoryID(recipe.category, in: modelContext) == categoryID
     }
   }
 

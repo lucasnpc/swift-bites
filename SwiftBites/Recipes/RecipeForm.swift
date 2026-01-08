@@ -29,8 +29,19 @@ struct RecipeForm: View {
       _serving = .init(initialValue: recipe.serving)
       _time = .init(initialValue: recipe.time)
       _instructions = .init(initialValue: recipe.instructions)
-      _selectedCategory = .init(initialValue: recipe.category)
-      _recipeIngredients = .init(initialValue: recipe.ingredients)
+      if let recipeContext = recipe.modelContext,
+         let category = recipe.category {
+        _selectedCategory = .init(initialValue: safeCategory(category, in: recipeContext))
+      } else {
+        _selectedCategory = .init(initialValue: nil)
+      }
+      if let recipeContext = recipe.modelContext {
+        _recipeIngredients = .init(initialValue: recipe.ingredients.filter { 
+          safeIngredientValue($0.ingredient, in: recipeContext) != nil 
+        })
+      } else {
+        _recipeIngredients = .init(initialValue: [])
+      }
       _imageData = .init(initialValue: recipe.imageData)
     }
   }
@@ -178,7 +189,8 @@ struct RecipeForm: View {
   @ViewBuilder
   private var ingredientsSection: some View {
     Section("Ingredients") {
-      if recipeIngredients.isEmpty {
+      let validIngredients = recipeIngredients.filter { $0.ingredient != nil }
+      if validIngredients.isEmpty {
         ContentUnavailableView(
           label: {
             Label("No Ingredients", systemImage: "list.clipboard")
@@ -193,11 +205,18 @@ struct RecipeForm: View {
           }
         )
       } else {
-        ForEach(recipeIngredients) { recipeIngredient in
+        ForEach(validIngredients) { recipeIngredient in
           HStack(alignment: .center) {
-            Text(recipeIngredient.ingredient.name)
-              .bold()
-              .layoutPriority(2)
+            if let ingredientName = safeIngredientName(recipeIngredient.ingredient) {
+              Text(ingredientName)
+                .bold()
+                .layoutPriority(2)
+            } else {
+              Text("Unknown Ingredient")
+                .bold()
+                .foregroundColor(.secondary)
+                .layoutPriority(2)
+            }
             Spacer()
             TextField("Quantity", text: Binding(
               get: {
@@ -207,10 +226,13 @@ struct RecipeForm: View {
                 recipeIngredient.quantity = quantity
               }
             ))
+            .keyboardType(.decimalPad)
             .layoutPriority(1)
           }
         }
-        .onDelete(perform: deleteIngredients)
+        .onDelete { offsets in
+          deleteIngredients(offsets: offsets, validIngredients: validIngredients)
+        }
 
         Button("Add Ingredient") {
           isIngredientsPickerPresented = true
@@ -266,13 +288,15 @@ struct RecipeForm: View {
     }
   }
 
-  private func deleteIngredients(offsets: IndexSet) {
+  private func deleteIngredients(offsets: IndexSet, validIngredients: [RecipeIngredient]) {
     withAnimation {
       for index in offsets {
-        let recipeIngredient = recipeIngredients[index]
-        modelContext.delete(recipeIngredient)
+        let recipeIngredient = validIngredients[index]
+        if let actualIndex = recipeIngredients.firstIndex(where: { $0.persistentModelID == recipeIngredient.persistentModelID }) {
+          modelContext.delete(recipeIngredient)
+          recipeIngredients.remove(at: actualIndex)
+        }
       }
-      recipeIngredients.remove(atOffsets: offsets)
     }
   }
 
@@ -280,6 +304,14 @@ struct RecipeForm: View {
     let trimmedName = name.trimmingCharacters(in: .whitespaces)
     guard !trimmedName.isEmpty, !instructions.trimmingCharacters(in: .whitespaces).isEmpty else {
       return
+    }
+    
+    let validRecipeIngredients = recipeIngredients.filter { safeIngredientValue($0.ingredient) != nil }
+    
+    for recipeIngredient in recipeIngredients {
+      if safeIngredientValue(recipeIngredient.ingredient) == nil {
+        modelContext.delete(recipeIngredient)
+      }
     }
     
     let currentRecipeID: PersistentIdentifier?
@@ -317,7 +349,7 @@ struct RecipeForm: View {
         )
         modelContext.insert(recipe)
         
-        for recipeIngredient in recipeIngredients {
+        for recipeIngredient in validRecipeIngredients {
           recipeIngredient.recipe = recipe
           modelContext.insert(recipeIngredient)
         }
@@ -331,15 +363,15 @@ struct RecipeForm: View {
         recipe.instructions = instructions
         recipe.imageData = imageData
         
-        let currentIDs = Set(recipeIngredients.compactMap { $0.persistentModelID })
+        let currentIDs = Set(validRecipeIngredients.compactMap { $0.persistentModelID })
         
         for existingIngredient in recipe.ingredients {
-            if !currentIDs.contains(existingIngredient.persistentModelID) {
-                modelContext.delete(existingIngredient)
-            }
+          if !currentIDs.contains(existingIngredient.persistentModelID) || safeIngredientValue(existingIngredient.ingredient) == nil {
+            modelContext.delete(existingIngredient)
+          }
         }
         
-        for recipeIngredient in recipeIngredients {
+        for recipeIngredient in validRecipeIngredients {
           if recipeIngredient.recipe == nil {
             recipeIngredient.recipe = recipe
             modelContext.insert(recipeIngredient)

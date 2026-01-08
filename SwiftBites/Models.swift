@@ -24,14 +24,14 @@ final class Category {
 @Model
 final class RecipeIngredient {
   @Relationship(deleteRule: .nullify)
-  var ingredient: Ingredient
+  var ingredient: Ingredient?
   
   var quantity: String
   
   @Relationship(deleteRule: .nullify)
   var recipe: Recipe?
   
-  init(ingredient: Ingredient, quantity: String = "", recipe: Recipe? = nil) {
+  init(ingredient: Ingredient? = nil, quantity: String = "", recipe: Recipe? = nil) {
     self.ingredient = ingredient
     self.quantity = quantity
     self.recipe = recipe

@@ -29,8 +29,8 @@ struct RecipeCell: View {
       Text(recipe.summary)
         .font(.subheadline)
       HStack(alignment: .center, spacing: 5) {
-        if let category = recipe.category {
-          tag(title: category.name, icon: "tag")
+        if let categoryName = safeCategoryName(recipe.category) {
+          tag(title: categoryName, icon: "tag")
         }
         tag(title: "\(recipe.time)m", icon: "clock")
         tag(title: "\(recipe.serving)p", icon: "person")
